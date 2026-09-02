@@ -109,3 +109,43 @@ jobs:
             ${{ env.DH_USER }}/mqtt-mgr-nginx:${{ steps.prep.outputs.sha_tag }}
           cache-from: type=gha,scope=nginx
           cache-to: type=gha,scope=nginx,mode=max
+
+  # ---------- 冒烟测试：拉取刚发布的镜像，起完整三容器栈，打真实接口 ----------
+  smoke-test:
+    runs-on: ubuntu-latest
+    needs: build-push
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare runtime files
+        run: touch mosquitto/config/passwd mosquitto/config/acl
+
+      - name: Point compose at published images
+        run: |
+          sed -i "s|registry.cn-hangzhou.aliyuncs.com/fjrcn/mqtt-mgr-backend:latest|${{ env.DH_USER }}/mqtt-mgr-backend:latest|" docker-compose.yaml
+          sed -i "s|registry.cn-hangzhou.aliyuncs.com/fjrcn/mqtt-mgr-nginx:latest|${{ env.DH_USER }}/mqtt-mgr-nginx:latest|" docker-compose.yaml
+          grep "image:" docker-compose.yaml
+
+      - name: Start full stack
+        run: docker compose up -d
+
+      - name: Health checks
+        run: |
+          ok=""
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1/api/ping >/dev/null; then ok=1; break; fi
+            sleep 2
+          done
+          if [ -z "$ok" ]; then
+            echo "✗ /api/ping 未就绪"
+            docker compose ps; docker compose logs --tail=60
+            exit 1
+          fi
+          echo "✓ /api/ping OK"
+          curl -sf http://127.0.0.1/api/register/status >/dev/null && echo "✓ /api/register/status OK"
+          curl -sf http://127.0.0.1/ | grep -q 'id="app"' && echo "✓ 前端页面 OK"
+
+      - name: Teardown
+        if: always()
+        run: docker compose down -v
