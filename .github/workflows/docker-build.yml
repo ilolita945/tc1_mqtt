@@ -134,16 +134,16 @@ jobs:
         run: |
           ok=""
           for i in $(seq 1 60); do
-            if curl -sf http://127.0.0.1/api/ping >/dev/null; then ok=1; break; fi
+            if curl -sf http://127.0.0.1/api/register/status >/dev/null; then ok=1; break; fi
             sleep 2
           done
           if [ -z "$ok" ]; then
-            echo "✗ /api/ping 未就绪"
+            echo "✗ /api/register/status 未就绪"
             docker compose ps; docker compose logs --tail=60
             exit 1
           fi
-          echo "✓ /api/ping OK"
-          curl -sf http://127.0.0.1/api/register/status >/dev/null && echo "✓ /api/register/status OK"
+          echo "✓ /api/register/status OK"
+          curl -sf http://127.0.0.1/api/register/status | grep -q '{' && echo "✓ 后端 JSON 响应 OK"
           curl -sf http://127.0.0.1/ | grep -q 'id="app"' && echo "✓ 前端页面 OK"
 
       - name: Teardown
