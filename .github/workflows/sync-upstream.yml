@@ -32,7 +32,8 @@ jobs:
           git config user.name "ilolita945"
           git config user.email "ilolita945@users.noreply.github.com"
           git rebase upstream/master
-          git push origin master
+          # fork 历史曾因上游 force-push 分叉，rebase 后必须强制推送才能落库
+          git push --force-with-lease origin master
           echo "::notice::已同步上游 ${BEHIND} 个提交并推送"
 
       - name: Rebuild images
